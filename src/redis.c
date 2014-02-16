@@ -1893,6 +1893,7 @@ void call(redisClient *c, int flags) {
  * other operations can be performed by the caller. Otherwise
  * if 0 is returned the client was destroyed (i.e. after QUIT). */
 int processCommand(redisClient *c) {
+    redisLog(REDIS_WARNING, "Processing command 0'%s'...", c->argv[0]->ptr);
     /* The QUIT command is handled separately. Normal command procs will
      * go through checking for replication and QUIT will cause trouble
      * when FORCE_REPLICATION is enabled and would be implemented in

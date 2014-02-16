@@ -38,13 +38,14 @@ robj *createObject(int type, void *ptr) {
     o->encoding = REDIS_ENCODING_RAW;
     o->ptr = ptr;
     o->refcount = 1;
-
+vista
     /* Set the LRU to the current lruclock (minutes resolution). */
     o->lru = server.lruclock;
     return o;
 }
 
 robj *createStringObject(char *ptr, size_t len) {
+    redisLog(REDIS_WARNING, "createStringObject");
     return createObject(REDIS_STRING,sdsnewlen(ptr,len));
 }
 
