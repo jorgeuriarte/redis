@@ -781,6 +781,7 @@ struct redisServer {
     int assert_line;
     int bug_report_start; /* True if bug report header was already logged. */
     int watchdog_period;  /* Software watchdog period in ms. 0 = off */
+    char *slave_partial_namespaces; /* Namespaces defining a partial slave */
 };
 
 typedef struct pubsubPattern {

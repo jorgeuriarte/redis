@@ -774,14 +774,11 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
     size_t len;
     unsigned int i;
 
-    redisLog(REDIS_WARNING,"LOADING OBJECT %d (at %d)\n",rdbtype,rioTell(rdb));
     if (rdbtype == REDIS_RDB_TYPE_STRING) {
-        redisLog(REDIS_WARNING, "->STRING: %s", rdb);
         /* Read string value */
         if ((o = rdbLoadEncodedStringObject(rdb)) == NULL) return NULL;
         o = tryObjectEncoding(o);
     } else if (rdbtype == REDIS_RDB_TYPE_LIST) {
-        redisLog(REDIS_WARNING, "->LIST: %s", rdb);
         /* Read list value */
         if ((len = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
 
@@ -814,7 +811,6 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
             }
         }
     } else if (rdbtype == REDIS_RDB_TYPE_SET) {
-        redisLog(REDIS_WARNING, "->SET: %s", rdb);
         /* Read list/set value */
         if ((len = rdbLoadLen(rdb,NULL)) == REDIS_RDB_LENERR) return NULL;
 
@@ -854,7 +850,6 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
             }
         }
     } else if (rdbtype == REDIS_RDB_TYPE_ZSET) {
-        redisLog(REDIS_WARNING, "->ZSET: %s", rdb);
         /* Read list/set value */
         size_t zsetlen;
         size_t maxelelen = 0;
@@ -889,7 +884,6 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
             maxelelen <= server.zset_max_ziplist_value)
                 zsetConvert(o,REDIS_ENCODING_ZIPLIST);
     } else if (rdbtype == REDIS_RDB_TYPE_HASH) {
-        redisLog(REDIS_WARNING, "->HASH: %s", rdb);
         size_t len;
         int ret;
 
@@ -964,7 +958,6 @@ robj *rdbLoadObject(int rdbtype, rio *rdb) {
         if (aux == NULL) return NULL;
         o = createObject(REDIS_STRING,NULL); /* string is just placeholder */
         o->ptr = zmalloc(sdslen(aux->ptr));
-        redisLog(REDIS_WARNING, "->OTRO: %s", o->ptr);
         memcpy(o->ptr,aux->ptr,sdslen(aux->ptr));
         decrRefCount(aux);
 
@@ -1154,7 +1147,6 @@ int rdbLoad(char *filename) {
         if ((key = rdbLoadStringObject(&rdb)) == NULL) goto eoferr;
         /* Read value */
         if ((val = rdbLoadObject(type,&rdb)) == NULL) goto eoferr;
-        redisLog(REDIS_WARNING, "Key: %s - Value: %s", key, val);
         /* Check if the key already expired. This function is used when loading
          * an RDB file from disk, either at startup, or when an RDB was
          * received from the master. In the latter case, the master is

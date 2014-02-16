@@ -90,9 +90,12 @@ robj *lookupKeyWriteOrReply(redisClient *c, robj *key, robj *reply) {
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
     sds copy = sdsdup(key->ptr);
-    int retval = dictAdd(db->dict, copy, val);
-
-    redisAssertWithInfo(NULL,key,retval == REDIS_OK);
+    if (!stringmatchlen(server.slave_partial_namespaces, strlen(server.slave_partial_namespaces), copy, sdslen(copy), 1)) {
+        int retval = dictAdd(db->dict, copy, val);
+        redisAssertWithInfo(NULL,key,retval == REDIS_OK);
+    } else {
+        redisLog(REDIS_WARNING, "->DESECHADO: %s", copy);
+    }
  }
 
 /* Overwrite an existing key with a new value. Incrementing the reference
