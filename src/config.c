@@ -79,6 +79,18 @@ void resetServerSaveParams() {
     server.saveparamslen = 0;
 }
 
+void appendNamespaceDiscard(sds discard) {
+    server.namespacediscards = zrealloc(server.namespacediscards, sizeof(sds)*server.namespacediscardslen+1);
+    server.namespacediscards[server.namespacediscardslen] = discard;
+    server.namespacediscardslen++;
+}
+
+void resetNamespaceDiscard() {
+    zfree(server.namespacediscards);
+    server.namespacediscards = NULL;
+    server.namespacediscardslen = 0;
+}
+
 void loadServerConfigFromString(char *config) {
     char *err = NULL;
     int linenum = 0, totlines, i;
@@ -293,6 +305,8 @@ void loadServerConfigFromString(char *config) {
             if ((server.repl_slave_ro = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
             }
+        } else if (!strcasecmp(argv[0], "slave-partial-namespace-discard") && argc == 2) {
+            appendNamespaceDiscard(sdsnew(argv[1]));
         } else if (!strcasecmp(argv[0],"rdbcompression") && argc == 2) {
             if ((server.rdb_compression = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
@@ -729,6 +743,14 @@ void configSetCommand(redisClient *c) {
             appendServerSaveParams(seconds, changes);
         }
         sdsfreesplitres(v,vlen);
+    } else if (!strcasecmp(c->argv[2]->ptr, "slave-partial-namespace-discard")) {
+        if (c->argc == 4) {
+            if (!strcmp(o->ptr, "")) {
+                resetNamespaceDiscard();
+            } else {
+                appendNamespaceDiscard(sdsnew(o->ptr));
+            }
+        }
     } else if (!strcasecmp(c->argv[2]->ptr,"slave-serve-stale-data")) {
         int yn = yesnotoi(o->ptr);
 
@@ -1072,6 +1094,17 @@ void configGetCommand(redisClient *c) {
         }
         addReplyBulkCString(c,"save");
         addReplyBulkCString(c,buf);
+        sdsfree(buf);
+        matches++;
+    }
+    if (stringmatch(pattern, "slave-partial-namespace-discard",0)) {
+        sds buf = sdsempty();
+        int j;
+        for (j = 0; j < server.namespacediscardslen; j++) {
+            buf = sdscatprintf(buf, (j==0)?"%s":" %s", server.namespacediscards[j]);
+        }
+        addReplyBulkCString(c, "slave-partial-namespace-discard");
+        addReplyBulkCString(c, buf);
         sdsfree(buf);
         matches++;
     }

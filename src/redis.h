@@ -818,6 +818,8 @@ struct redisServer {
     int assert_line;
     int bug_report_start; /* True if bug report header was already logged. */
     int watchdog_period;  /* Software watchdog period in ms. 0 = off */
+    sds *namespacediscards; /* Namespaces defining a partial slave */
+    int namespacediscardslen;
 };
 
 typedef struct pubsubPattern {
@@ -1205,6 +1207,8 @@ sds keyspaceEventsFlagsToString(int flags);
 void loadServerConfig(char *filename, char *options);
 void appendServerSaveParams(time_t seconds, int changes);
 void resetServerSaveParams();
+void appendNamespaceDiscard(sds discard);
+void resetNamespaceDiscard();
 struct rewriteConfigState; /* Forward declaration to export API. */
 void rewriteConfigRewriteLine(struct rewriteConfigState *state, char *option, sds line, int force);
 int rewriteConfig(char *path);
@@ -1235,6 +1239,7 @@ unsigned int countKeysInSlot(unsigned int hashslot);
 int verifyClusterConfigWithData(void);
 void scanGenericCommand(redisClient *c, robj *o, unsigned long cursor);
 int parseScanCursorOrReply(redisClient *c, robj *o, unsigned long *cursor);
+int shouldDiscardKey(robj *o);
 
 /* API to get key arguments from commands */
 #define REDIS_GETKEYS_ALL 0
