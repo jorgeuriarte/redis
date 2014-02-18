@@ -78,6 +78,18 @@ void resetServerSaveParams() {
     server.saveparamslen = 0;
 }
 
+void appendNamespaceDiscard(sds discard) {
+    server.namespace_discards = zrealloc(server.namespace_discards, sizeof(sds)*server.namespace_discards_len+1);
+    server.namespace_discards[server.namespace_discards_len] = discard;
+    server.namespace_discards_len++;
+}
+
+void resetNamespaceDiscard() {
+    zfree(server.namespace_discards);
+    server.namespace_discards = NULL;
+    server.namespace_discards_len = 0;
+}
+
 void loadServerConfigFromString(char *config) {
     char *err = NULL;
     int linenum = 0, totlines, i;
@@ -290,8 +302,8 @@ void loadServerConfigFromString(char *config) {
             if ((server.repl_slave_ro = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
             }
-        } else if (!strcasecmp(argv[0], "slave-partial-namespaces") && argc == 2) {
-            server.slave_partial_namespaces = sdsnew(argv[1]);
+        } else if (!strcasecmp(argv[0], "slave-partial-namespace-discard") && argc == 2) {
+            appendNamespaceDiscard(sdsnew(argv[1]));
         } else if (!strcasecmp(argv[0],"rdbcompression") && argc == 2) {
             if ((server.rdb_compression = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
@@ -912,6 +924,7 @@ void configGetCommand(redisClient *c) {
     config_get_string_field("unixsocket",server.unixsocket);
     config_get_string_field("logfile",server.logfile);
     config_get_string_field("pidfile",server.pidfile);
+// TODO    config_get_string_field("slave-partial-namespace-discard", server.slave_partial_namespace_discard);
 
     /* Numerical values */
     config_get_numerical_field("maxmemory",server.maxmemory);
@@ -962,7 +975,6 @@ void configGetCommand(redisClient *c) {
             server.repl_serve_stale_data);
     config_get_bool_field("slave-read-only",
             server.repl_slave_ro);
-    config_get_string_field("slave-partial-namespaces", server.slave_partial_namespaces);
     config_get_bool_field("stop-writes-on-bgsave-error",
             server.stop_writes_on_bgsave_err);
     config_get_bool_field("daemonize", server.daemonize);

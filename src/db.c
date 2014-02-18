@@ -90,11 +90,15 @@ robj *lookupKeyWriteOrReply(redisClient *c, robj *key, robj *reply) {
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
     sds copy = sdsdup(key->ptr);
-    if (!stringmatchlen(server.slave_partial_namespaces, strlen(server.slave_partial_namespaces), copy, sdslen(copy), 1)) {
+    int i, discard = 0;
+    if (server.masterhost != NULL) {
+        for (i = 0; !discard && i < server.namespace_discards_len; i++) {
+            discard = stringmatchlen(server.namespace_discards[i], strlen(server.namespace_discards[i]), copy, sdslen(copy), 1);
+        }
+    }
+    if (!discard) {
         int retval = dictAdd(db->dict, copy, val);
         redisAssertWithInfo(NULL,key,retval == REDIS_OK);
-    } else {
-        redisLog(REDIS_WARNING, "->DESECHADO: %s", copy);
     }
  }
 
