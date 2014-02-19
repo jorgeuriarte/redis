@@ -92,11 +92,22 @@ robj *lookupKeyWriteOrReply(redisClient *c, robj *key, robj *reply) {
  * The program is aborted if the key already exists. */
 void dbAdd(redisDb *db, robj *key, robj *val) {
     sds copy = sdsdup(key->ptr);
-    int retval = dictAdd(db->dict, copy, val);
+    if (!shouldDiscardKey(key)) {
+        int retval = dictAdd(db->dict, copy, val);
+        redisAssertWithInfo(NULL,key,retval == REDIS_OK);
+        if (server.cluster_enabled) slotToKeyAdd(key);
+    }
+}
 
-    redisAssertWithInfo(NULL,key,retval == REDIS_OK);
-    if (server.cluster_enabled) slotToKeyAdd(key);
- }
+int shouldDiscardKey(robj *key) {
+    int i, discard = 0;
+    if (server.masterhost != NULL) {
+        for (i = 0; !discard && i < server.namespacediscardslen; i++) {
+            discard = stringmatchlen(server.namespacediscards[i], strlen(server.namespacediscards[i]), key->ptr, sdslen(key->ptr), 1);
+        }
+    }
+    return discard;
+}
 
 /* Overwrite an existing key with a new value. Incrementing the reference
  * count of the new value is up to the caller.
@@ -104,6 +115,7 @@ void dbAdd(redisDb *db, robj *key, robj *val) {
  *
  * The program is aborted if the key was not already present. */
 void dbOverwrite(redisDb *db, robj *key, robj *val) {
+    redisLog(REDIS_WARNING, "\n\nDBOVERWRITE: %s\n", key->ptr);
     struct dictEntry *de = dictFind(db->dict,key->ptr);
     
     redisAssertWithInfo(NULL,key,de != NULL);
@@ -117,14 +129,17 @@ void dbOverwrite(redisDb *db, robj *key, robj *val) {
  * 2) clients WATCHing for the destination key notified.
  * 3) The expire time of the key is reset (the key is made persistent). */
 void setKey(redisDb *db, robj *key, robj *val) {
-    if (lookupKeyWrite(db,key) == NULL) {
-        dbAdd(db,key,val);
-    } else {
-        dbOverwrite(db,key,val);
+    if (!shouldDiscardKey(key)) {
+        if (lookupKeyWrite(db,key) == NULL) {
+            dbAdd(db,key,val);
+        } else {
+            dbOverwrite(db,key,val);
+        }
+        redisLog(REDIS_WARNING, "setKey(3): %s", key->ptr);
+        incrRefCount(val);
+        removeExpire(db,key);
+        signalModifiedKey(db,key);
     }
-    incrRefCount(val);
-    removeExpire(db,key);
-    signalModifiedKey(db,key);
 }
 
 int dbExists(redisDb *db, robj *key) {
