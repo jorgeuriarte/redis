@@ -47,7 +47,12 @@ proc spawn_instance {type base_port count} {
         close $cfg
 
         # Finally exec it and remember the pid for later cleanup.
-        set sentinel_pid [exec ../../src/redis-sentinel $cfgfile &]
+        if {$type eq "redis"} {
+            set prgname redis-server
+        } else {
+            set prgname redis-sentinel
+        }
+        set sentinel_pid [exec ../../src/${prgname} $cfgfile &]
         lappend ::pids $sentinel_pid
 
         # Check availability
@@ -56,10 +61,11 @@ proc spawn_instance {type base_port count} {
         }
 
         # Push the instance into the right list
-        lappend ${type}_instances [list \
+        lappend ::${type}_instances [list \
+            pid $sentinel_pid \
             host 127.0.0.1 \
             port $port \
-            [redis 127.0.0.1 $port] \
+            link [redis 127.0.0.1 $port] \
         ]
     }
 }
@@ -110,9 +116,108 @@ proc test {descr code} {
 proc run_tests {} {
     set tests [lsort [glob ../sentinel-tests/*]]
     foreach test $tests {
-        puts [colorstr green "### [lindex [file split $test] end]"]
+        puts [colorstr yellow "Testing unit: [lindex [file split $test] end]"]
         source $test
     }
+}
+
+# The "S" command is used to interact with the N-th Sentinel.
+# The general form is:
+#
+# S <sentinel-id> command arg arg arg ...
+#
+# Example to ping the Sentinel 0 (first instance): S 0 PING
+proc S {n args} {
+    set s [lindex $::sentinel_instances $n]
+    [dict get $s link] {*}$args
+}
+
+# Like R but to chat with Redis instances.
+proc R {n args} {
+    set r [lindex $::redis_instances $n]
+    [dict get $r link] {*}$args
+}
+
+proc get_info_field {info field} {
+    set fl [string length $field]
+    append field :
+    foreach line [split $info "\n"] {
+        set line [string trim $line "\r\n "]
+        if {[string range $line 0 $fl] eq $field} {
+            return [string range $line [expr {$fl+1}] end]
+        }
+    }
+    return {}
+}
+
+proc SI {n field} {
+    get_info_field [S $n info] $field
+}
+
+proc RI {n field} {
+    get_info_field [R $n info] $field
+}
+
+# Iterate over IDs of sentinel or redis instances.
+proc foreach_instance_id {instances idvar code} {
+    upvar 1 $idvar id
+    for {set id 0} {$id < [llength $instances]} {incr id} {
+        set errcode [catch {uplevel 1 $code} result]
+        if {$errcode == 1} {
+            error $result $::errorInfo $::errorCode
+        } elseif {$errcode != 0} {
+            return -code $errcode $result
+        }
+    }
+}
+
+proc foreach_sentinel_id {idvar code} {
+    set errcode [catch {uplevel 1 [list foreach_instance_id $::sentinel_instances $idvar $code]} result]
+    return -code $errcode $result
+}
+
+proc foreach_redis_id {idvar code} {
+    set errcode [catch {uplevel 1 [list foreach_instance_id $::redis_instances $idvar $code]} result]
+    return -code $errcode $result
+}
+
+# Get the specific attribute of the specified instance type, id.
+proc get_instance_attrib {type id attrib} {
+    dict get [lindex [set ::${type}_instances] $id] $attrib
+}
+
+# Create a master-slave cluster of the given number of total instances.
+# The first instance "0" is the master, all others are configured as
+# slaves.
+proc create_redis_master_slave_cluster n {
+    foreach_redis_id id {
+        if {$id == 0} {
+            # Our master.
+            R $id flushall
+            R $id slaveof no one
+        } elseif {$id < $n} {
+            R $id slaveof [get_instance_attrib redis 0 host] \
+                          [get_instance_attrib redis 0 port]
+        } else {
+            # Instances not part of the cluster.
+            R $id slaveof no one
+        }
+    }
+    # Wait for all the slaves to sync.
+    wait_for_condition 100 50 {
+        [RI 0 connected_slaves] == ($n-1)
+    } else {
+        fail "Unable to create a master-slaves cluster."
+    }
+}
+
+proc get_instance_id_by_port {type port} {
+    foreach_${type}_id id {
+        if {[get_instance_attrib $type $id port] == $port} {
+            return $id
+        }
+    }
+    fail "Instance $type port $port not found."
 }
 
 if {[catch main e]} {
