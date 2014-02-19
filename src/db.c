@@ -115,7 +115,6 @@ int shouldDiscardKey(robj *key) {
  *
  * The program is aborted if the key was not already present. */
 void dbOverwrite(redisDb *db, robj *key, robj *val) {
-    redisLog(REDIS_WARNING, "\n\nDBOVERWRITE: %s\n", key->ptr);
     struct dictEntry *de = dictFind(db->dict,key->ptr);
     
     redisAssertWithInfo(NULL,key,de != NULL);
@@ -135,7 +134,6 @@ void setKey(redisDb *db, robj *key, robj *val) {
         } else {
             dbOverwrite(db,key,val);
         }
-        redisLog(REDIS_WARNING, "setKey(3): %s", key->ptr);
         incrRefCount(val);
         removeExpire(db,key);
         signalModifiedKey(db,key);
