@@ -47,12 +47,16 @@ proc spawn_instance {type base_port count} {
         close $cfg
 
         # Finally exec it and remember the pid for later cleanup.
+<<<<<<< HEAD
         if {$type eq "redis"} {
             set prgname redis-server
         } else {
             set prgname redis-sentinel
         }
         set sentinel_pid [exec ../../src/${prgname} $cfgfile &]
+=======
+        set sentinel_pid [exec ../../src/redis-sentinel $cfgfile &]
+>>>>>>> 6e4662e4798fdee92e60b3452f7832a38ce6489e
         lappend ::pids $sentinel_pid
 
         # Check availability
@@ -61,11 +65,18 @@ proc spawn_instance {type base_port count} {
         }
 
         # Push the instance into the right list
+<<<<<<< HEAD
         lappend ::${type}_instances [list \
             pid $sentinel_pid \
             host 127.0.0.1 \
             port $port \
             link [redis 127.0.0.1 $port] \
+=======
+        lappend ${type}_instances [list \
+            host 127.0.0.1 \
+            port $port \
+            [redis 127.0.0.1 $port] \
+>>>>>>> 6e4662e4798fdee92e60b3452f7832a38ce6489e
         ]
     }
 }
@@ -116,11 +127,16 @@ proc test {descr code} {
 proc run_tests {} {
     set tests [lsort [glob ../sentinel-tests/*]]
     foreach test $tests {
+<<<<<<< HEAD
         puts [colorstr yellow "Testing unit: [lindex [file split $test] end]"]
+=======
+        puts [colorstr green "### [lindex [file split $test] end]"]
+>>>>>>> 6e4662e4798fdee92e60b3452f7832a38ce6489e
         source $test
     }
 }
 
+<<<<<<< HEAD
 # The "S" command is used to interact with the N-th Sentinel.
 # The general form is:
 #
@@ -220,6 +236,8 @@ proc get_instance_id_by_port {type port} {
     fail "Instance $type port $port not found."
 }
 
+=======
+>>>>>>> 6e4662e4798fdee92e60b3452f7832a38ce6489e
 if {[catch main e]} {
     puts $::errorInfo
     cleanup
