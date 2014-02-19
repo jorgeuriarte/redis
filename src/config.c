@@ -305,8 +305,11 @@ void loadServerConfigFromString(char *config) {
             if ((server.repl_slave_ro = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
             }
-        } else if (!strcasecmp(argv[0], "slave-partial-namespace-discard") && argc == 2) {
-            appendNamespaceDiscard(sdsnew(argv[1]));
+        } else if (!strcasecmp(argv[0], "slave-partial-namespace-discard") && argc >= 2) {
+            int i;
+            for (i = 1; i<argc; i++) {
+                appendNamespaceDiscard(sdsnew(argv[i]));
+            }
         } else if (!strcasecmp(argv[0],"rdbcompression") && argc == 2) {
             if ((server.rdb_compression = yesnotoi(argv[1])) == -1) {
                 err = "argument must be 'yes' or 'no'"; goto loaderr;
