@@ -1,3 +1,52 @@
+Partial slaves support in Redis (experimental fork)
+---------------------------------------------------
+
+Executive review :P
+-------------------
+
+I need slaves to be able to discard big-parts of its master keyspace in order to save memory, in
+the cases where I'm *sure* there's no need for that specific slave to hold that information.
+
+The setup
+---------
+
+We've been successfully using redis' master-slave scheme during some time now.
+Our content comes mainly from one or two central sources, that write directly to the redis master.
+The data is then massively consumed from a network of redis slaves sharing box with our front applications, in a read-ony system (except for some temporal operations, intersections and so...)
+
+The distribution of our data has a core keyspace with every non-localized information of the system.
+Those items are bound to be consumed from almost any of the sites. But there's also a BIG PART of our keyspace designed to hold i18n'ed information (names, descriptions, summaries...), in more than 30 languages (and counting...)
+
+There's a high degree of locality between some of the fronts/domains accessed, and the different i18n versions of the data, so the spanish site will only access to the "es_ES:*"" keyspace to get texts, the italian site will only require info from the "it_IT:*"" keyspace, and so on.
+
+Memory
+------
+
+Lately, we've been realizing that as core-keyspace grows bigger, the part of any given slave's keyspace that will *never* be required from it's application is also growing. As traffic gets bigger, we tend to specializy machines (and its attached redis slave) to a single domain, and so it makes no sense to hold all that information in our slaves.
+
+In terms of memory, it seems that our fronts' slaves need only around 20% of the master size, so if our master grows up to 20Gb, it seems that we have a waste of almost 16Gb in memory in our slaves (easily translated to money)
+
+So I started playing with the idea of a special configuration in slaves to enable them partial replication of a subset of the master keyspace.
+
+Usage:
+
+The usage should be as simple as allowing any slave to describe in its config the glob expressions of the keyspaces that it's not supposed to replicate.
+
+In redis.conf:
+
+  slave-partial-namespace-discard es_ES:* es_MX:*
+  slave-partial-namespace-discard en_GB:* *:masteronly:*
+
+With this configuration, any key fitting those glob expressions will be automatically DISCARDED in the slaves during
+the sincronization.
+
+Disclaimer:
+
+This patch is only a proof of concept. It's been easy to hack, there's almost no core code involved, and its performance and structural impact is apparently low, but I fear I might be missing important points.
+Is there any severe flaw in my approach? Ideas? Criticisms?
+Any insight on why this is/isn't a good/awful idea and/or implementation would be appreciated.
+
+Thank you. Now, the usual Redis' README stuff follows, enjoy it!
 Where to find complete Redis documentation?
 -------------------------------------------
 
